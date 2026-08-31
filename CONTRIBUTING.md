@@ -25,3 +25,5 @@ We are happy to accept any contributions that make sense and respect the rules l
 By contributing your code, you agree to license your contribution under our [LICENSE](LICENSE).
 
 [editorconfig]: <http://editorconfig.org/>
+
+See doc/ci.md for how CI and the release workflow fit together.
