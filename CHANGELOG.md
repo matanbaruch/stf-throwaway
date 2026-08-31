@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 (2026-08-31)
+
+* Note how the watchdog restores a rebooted device by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/1
+* Point the contributing guide at the CI docs by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/2
+
+### New Contributors
+
+* @matanbaruch made their first contribution in https://github.com/matanbaruch/stf-throwaway/pull/1
+
+**Full Changelog**: https://github.com/matanbaruch/stf-throwaway/compare/v0.1.0...v0.2.0
+
 ## 3.7.9 (2026-07-08)
 
 * Update OS image from ubuntu2204 to ubuntu2404 by @koral-- in https://github.com/DeviceFarmer/stf/pull/891
