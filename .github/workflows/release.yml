@@ -159,5 +159,3 @@ jobs:
     with:
       ref: v${{ inputs.version }}
       tag: ${{ inputs.version }}
-
-# temporary marker to make GitHub index this workflow
