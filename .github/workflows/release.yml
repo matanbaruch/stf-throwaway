@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the v prefix (e.g. 3.8.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Check the version is releasable
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$VERSION is not a three part version like 3.8.0, with no v prefix"
+            exit 1
+          fi
+
+          CURRENT=$(node -p 'require("./package.json").version')
+          echo "current=$CURRENT requested=$VERSION"
+          echo "CURRENT=$CURRENT" >> "$GITHUB_ENV"
+          if [ "$CURRENT" = "$VERSION" ] ||
+             [ "$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | head -1)" != "$CURRENT" ]
+          then
+            echo "::error::$VERSION is not greater than $CURRENT"
+            exit 1
+          fi
+
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::tag v$VERSION already exists"
+            exit 1
+          fi
+
+          if npm view "@devicefarmer/stf@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::@devicefarmer/stf@$VERSION is already published to npm"
+            exit 1
+          fi
+
+      - name: Generate the release notes
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PREVIOUS=$(git tag --sort=-creatordate | head -1)
+          echo "previous tag: ${PREVIOUS:-none}"
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -X POST \
+            -f tag_name="v$VERSION" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f previous_tag_name="$PREVIOUS" \
+            --jq .body > notes.md
+          cat notes.md
+
+      - name: Bump the version and the changelog
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          node -e '
+            var fs = require("fs")
+            var file = "package.json"
+            var raw = fs.readFileSync(file, "utf8")
+            var next = raw.replace(/"version": "[^"]+"/, "\"version\": \"" + process.argv[1] + "\"")
+            if (next === raw) {
+              console.error("::error::could not rewrite the version field")
+              process.exit(1)
+            }
+            fs.writeFileSync(file, next)
+          ' "$VERSION"
+          node .github/scripts/changelog.js CHANGELOG.md "$VERSION" notes.md
+          git diff --stat
+
+      - name: Commit, tag and publish
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json CHANGELOG.md
+          git commit -s -m "Bump version from $CURRENT to $VERSION"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+          gh release create "v$VERSION" --title "v$VERSION" --notes-file notes.md
+
+  npm:
+    name: Publish to npm
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: v${{ inputs.version }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Take npm to a version that can publish with OIDC
+        run: npm install -g npm@^11.5.1
+
+      - name: Install system dependencies
+        timeout-minutes: 12
+        run: |
+          bash .github/scripts/apt-install.sh \
+            build-essential cmake ninja-build pkg-config python3 \
+            libzmq3-dev libprotobuf-dev protobuf-compiler \
+            graphicsmagick yasm nasm git curl zip unzip wget
+
+      - name: Allow bower git:// dependencies over https
+        run: |
+          git config --global url."https://github.com/".insteadOf git://github.com/
+          git config --global url."https://".insteadOf git://
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+
+      - name: Install
+        run: npm install --omit=optional --loglevel http
+
+      - name: Publish
+        run: npm publish --access public --dry-run
+
+  docker:
+    needs: release
+    uses: ./.github/workflows/docker-build.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      ref: v${{ inputs.version }}
+      tag: ${{ inputs.version }}
