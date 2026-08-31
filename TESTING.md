@@ -51,3 +51,5 @@ Test results can be found in:
 - `export STF_USERNAME='user'`
 - `export STF_PASSWORD='pass'`
 - `gulp protractor`
+
+A rebooted emulator comes back online natively but loses root, so the watchdog restores it.
