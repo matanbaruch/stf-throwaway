@@ -29,3 +29,5 @@ By contributing your code, you agree to license your contribution under our [LIC
 See doc/ci.md for how CI and the release workflow fit together.
 
 Tested by the release split dry run.
+
+<!-- demo: minicap capture path -->
