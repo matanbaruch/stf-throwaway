@@ -6,6 +6,12 @@
 // with the sub-headings dropped to h3 so the version headings keep h2.
 //
 // usage: node changelog.js <CHANGELOG.md> <version> <notes-file>
+//        node changelog.js --extract <CHANGELOG.md> <version>
+//
+// The extract mode prints one version's section back out, without its heading.
+// Release uses it for the GitHub release body so the body and the changelog
+// cannot drift, and so an edit made while reviewing the release pull request
+// reaches both.
 //
 
 var fs = require('fs')
@@ -57,14 +63,51 @@ function insert(changelog, section) {
   return '# Changelog\n\n' + section + changelog.replace(/^# Changelog\n+/, '')
 }
 
+// Owned here rather than in the workflow so both modes agree on what a version
+// heading looks like.
+function heading(version) {
+  return '## ' + version + ' ('
+}
+
+// Everything between this version's heading and the next h2.
+function extract(changelog, version) {
+  var lines = changelog.split('\n')
+  var start = -1
+  for (var i = 0; i < lines.length; i++) {
+    if (lines[i].indexOf(heading(version)) === 0) {
+      start = i
+      break
+    }
+  }
+  if (start < 0) {
+    console.error('CHANGELOG.md has no ' + version + ' section')
+    process.exit(1)
+  }
+
+  var out = []
+  for (var j = start + 1; j < lines.length; j++) {
+    if (lines[j].indexOf('## ') === 0) {
+      break
+    }
+    out.push(lines[j])
+  }
+  return out.join('\n').replace(/^\n+/, '').replace(/\n+$/, '')
+}
+
 function main() {
+  if (process.argv[2] === '--extract') {
+    var source = process.argv[3]
+    console.log(extract(fs.readFileSync(source, 'utf8'), process.argv[4]))
+    return
+  }
+
   var file = process.argv[2]
   var version = process.argv[3]
   var date = new Date().toISOString().slice(0, 10)
   var notes = fs.readFileSync(process.argv[4], 'utf8')
 
   var changelog = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '# Changelog\n'
-  if (changelog.indexOf('\n## ' + version + ' (') >= 0) {
+  if (changelog.indexOf('\n' + heading(version)) >= 0) {
     console.error('CHANGELOG.md already has a ' + version + ' section')
     process.exit(1)
   }
@@ -77,7 +120,7 @@ function main() {
 
   // Version headings own h2 here, so the sub-sections drop to h3 rather than
   // reading as separate releases.
-  var body = '## ' + version + ' (' + date + ')\n\n' + lines.join('\n') + '\n'
+  var body = heading(version) + date + ')\n\n' + lines.join('\n') + '\n'
 
   var newcomers = contributors(notes)
   if (newcomers.length) {

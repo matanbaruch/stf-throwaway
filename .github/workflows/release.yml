@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, without the v prefix (e.g. 3.8.0)'
+        description: 'Version already bumped on the default branch, without the v prefix (e.g. 3.8.0)'
         required: true
         type: string
 
@@ -24,26 +24,32 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
 
       - name: Check the version is releasable
         env:
           VERSION: ${{ inputs.version }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
+
+          # release/v* satisfies the version check below by construction, so
+          # without this the branch could be tagged and published unmerged.
+          if [ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ]; then
+            echo "::error::run this on $DEFAULT_BRANCH, not $GITHUB_REF_NAME"
+            exit 1
+          fi
 
           if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
             echo "::error::$VERSION is not a three part version like 3.8.0, with no v prefix"
             exit 1
           fi
 
+          # Prepare release bumps package.json and Release tags what it produced,
+          # so equality is the precondition here rather than an increase.
           CURRENT=$(node -p 'require("./package.json").version')
-          echo "current=$CURRENT requested=$VERSION"
-          echo "CURRENT=$CURRENT" >> "$GITHUB_ENV"
-          if [ "$CURRENT" = "$VERSION" ] ||
-             [ "$(printf '%s\n%s\n' "$CURRENT" "$VERSION" | sort -V | head -1)" != "$CURRENT" ]
-          then
-            echo "::error::$VERSION is not greater than $CURRENT"
+          if [ "$CURRENT" != "$VERSION" ]; then
+            echo "::error::package.json is at $CURRENT, so the $VERSION bump has not merged yet"
             exit 1
           fi
 
@@ -57,42 +63,15 @@ jobs:
             exit 1
           fi
 
-      - name: Generate the release notes
+      - name: Read the release notes back out of the changelog
         env:
           VERSION: ${{ inputs.version }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          PREVIOUS=$(git tag --sort=-creatordate | head -1)
-          echo "previous tag: ${PREVIOUS:-none}"
-
-          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -X POST \
-            -f tag_name="v$VERSION" \
-            -f target_commitish="$GITHUB_SHA" \
-            -f previous_tag_name="$PREVIOUS" \
-            --jq .body > notes.md
+          node .github/scripts/changelog.js --extract CHANGELOG.md "$VERSION" > notes.md
           cat notes.md
 
-      - name: Bump the version and the changelog
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          node -e '
-            var fs = require("fs")
-            var file = "package.json"
-            var raw = fs.readFileSync(file, "utf8")
-            var next = raw.replace(/"version": "[^"]+"/, "\"version\": \"" + process.argv[1] + "\"")
-            if (next === raw) {
-              console.error("::error::could not rewrite the version field")
-              process.exit(1)
-            }
-            fs.writeFileSync(file, next)
-          ' "$VERSION"
-          node .github/scripts/changelog.js CHANGELOG.md "$VERSION" notes.md
-          git diff --stat
-
-      - name: Commit, tag and publish
+      - name: Tag and publish
         env:
           VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ github.token }}
@@ -101,10 +80,6 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json CHANGELOG.md
-          git commit -s -m "Bump version from $CURRENT to $VERSION"
-          git push origin "HEAD:$GITHUB_REF_NAME"
-
           git tag "v$VERSION"
           git push origin "v$VERSION"
 
@@ -114,48 +89,12 @@ jobs:
     name: Publish to npm
     needs: release
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      id-token: write
     steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: v${{ inputs.version }}
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-
-      - name: Take npm to a version that can publish with OIDC
-        run: npm install -g npm@^11.5.1
-
-      - name: Install system dependencies
-        timeout-minutes: 12
-        run: |
-          bash .github/scripts/apt-install.sh \
-            build-essential cmake ninja-build pkg-config python3 \
-            libzmq3-dev libprotobuf-dev protobuf-compiler \
-            graphicsmagick yasm nasm git curl zip unzip wget
-
-      - name: Allow bower git:// dependencies over https
-        run: |
-          git config --global url."https://github.com/".insteadOf git://github.com/
-          git config --global url."https://".insteadOf git://
-          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
-
-      - name: Install
-        run: npm install --omit=optional --loglevel http
-
-      - name: Publish
-        run: npm publish --access public --dry-run
+      - run: echo "FORK TEST STUB - real job unchanged from the PR"
 
   docker:
+    name: Docker
     needs: release
-    uses: ./.github/workflows/docker-build.yml
-    permissions:
-      contents: read
-      id-token: write
-    with:
-      ref: v${{ inputs.version }}
-      tag: ${{ inputs.version }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "FORK TEST STUB - real job unchanged from the PR"

@@ -19,6 +19,7 @@ jobs:
       id-token: write
     with:
       tag: latest
+      push: ${{ github.event_name == 'push' }}
 
   debian:
     name: Debian image
