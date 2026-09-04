@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 (2026-09-04)
+
+* Note the minicap capture path in the docs by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/7
+* Clarify how the provider registers a device by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/6
+
+**Full Changelog**: https://github.com/matanbaruch/stf-throwaway/compare/v0.3.0...v0.4.0
+
 ## 0.3.0 (2026-09-04)
 
 * Note the release split dry run by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/4
