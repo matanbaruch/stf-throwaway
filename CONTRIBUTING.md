@@ -27,3 +27,5 @@ By contributing your code, you agree to license your contribution under our [LIC
 [editorconfig]: <http://editorconfig.org/>
 
 See doc/ci.md for how CI and the release workflow fit together.
+
+Tested by the release split dry run.
