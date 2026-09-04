@@ -499,3 +499,5 @@ Copyright © 2017 The OpenSTF Project. All Rights Reserved.
 Project is a part of [OW2 consortium](https://projects.ow2.org/view/devicefarmer/).
 
 <!-- typo sweep: no user visible change -->
+
+<!-- demo: provider note -->
