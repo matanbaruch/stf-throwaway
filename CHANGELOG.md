@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 (2026-09-04)
+
+* Note the release split dry run by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/4
+
+**Full Changelog**: https://github.com/matanbaruch/stf-throwaway/compare/v0.2.0...v0.3.0
+
 ## 0.2.0 (2026-08-31)
 
 * Note how the watchdog restores a rebooted device by @matanbaruch in https://github.com/matanbaruch/stf-throwaway/pull/1
