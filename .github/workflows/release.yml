@@ -90,11 +90,17 @@ jobs:
     needs: release
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "FORK TEST STUB - real job unchanged from the PR"
+      - name: Disabled on the demo repository
+        run: |
+          echo "The real job publishes with npm trusted publishing, which binds"
+          echo "to DeviceFarmer/stf and release.yml. It cannot run here."
 
   docker:
     name: Docker
     needs: release
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "FORK TEST STUB - real job unchanged from the PR"
+      - name: Disabled on the demo repository
+        run: |
+          echo "The real job pushes to Docker Hub over OIDC, which binds to the"
+          echo "DeviceFarmer organization. It cannot run here."
